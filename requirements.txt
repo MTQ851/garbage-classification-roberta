@@ -1,0 +1,29 @@
+# --- 深度学习核心 (Deep Learning Core) ---
+# 建议 PyTorch 2.0 以上版本以获得更好的性能
+torch>=2.0.0
+
+# Hugging Face 生态 (RoBERTa 模型与训练)
+# 指定较新版本以支持 eval_strategy 参数
+transformers>=4.41.0
+# 训练必须依赖库 (解决 ImportError 问题)
+accelerate>=0.30.0
+
+# --- 数据处理与科学计算 (Data Science) ---
+pandas>=2.0.0
+numpy>=1.24.0
+# 用于数据切分 (train_test_split) 和 评估指标 (accuracy_score)
+scikit-learn>=1.3.0
+
+# --- API 服务 (Web Server) ---
+fastapi>=0.100.0
+# 包含 standard 依赖 (如 httptools, uvloop) 以提升性能
+uvicorn[standard]>=0.22.0
+pydantic>=2.0.0
+
+# --- 工具与其他 (Utilities) ---
+# 用于进度条显示
+tqdm>=4.65.0
+# 用于测试 API 请求
+requests>=2.31.0
+# 用于旧版机器学习模型保存 (可选)
+joblib>=1.3.0
