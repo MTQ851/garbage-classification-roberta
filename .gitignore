@@ -1,0 +1,26 @@
+# --- Python 缓存 ---
+__pycache__/
+*.py[cod]
+
+# --- 训练出的模型权重 (太大了，不要传) ---
+model/roberta_garbage_model/
+src/bert_garbage_model/
+*.safetensors
+*.bin
+*.pth
+
+# --- 训练过程中的检查点 ---
+src/results/
+results/
+logs/
+
+# --- 运行生成的临时文件 ---
+src/bad_cases.csv
+
+# --- IDE 配置 ---
+.idea/
+.vscode/
+
+# --- 虚拟环境 (如果有) ---
+venv/
+env/
