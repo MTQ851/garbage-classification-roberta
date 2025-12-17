@@ -4,6 +4,7 @@ import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from starlette.middleware.cors import CORSMiddleware
 from transformers import BertTokenizer, BertForSequenceClassification
 
 
@@ -96,6 +97,15 @@ class PredictResponse(BaseModel):
 
 
 app = FastAPI(title="垃圾分类 API", version="1.3")
+# 解决跨域问题 (CORS)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源，生产环境建议改为具体的域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许 GET, POST 等所有方法
+    allow_headers=["*"],
+)
+
 
 classifier = None
 

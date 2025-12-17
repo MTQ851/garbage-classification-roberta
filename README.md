@@ -21,20 +21,26 @@
 *   **生产级接口**：基于 **FastAPI** 封装了高性能的 HTTP 接口，支持 GET 请求调用。
 *   **数据清洗工具**：内置数据冲突检测脚本，防止“脏数据”影响模型训练。
 
+###    界面预览
+![Web界面预览](assets/web_ui_preview.png)
 ### 📂 目录结构
 ```text
 garbage_classification/
+├── assets/                    # [新增] 存放项目截图等资源
+│   └── web_ui_preview.png
 ├── data/
 │   └── garbage_sorting.csv    # 原始数据集 (id, garbage_name, type)
 ├── src/
 │   ├── train.py               # 模型训练脚本 (Fine-tuning)
 │   ├── predict.py             # 命令行预测脚本 (包含规则+模型)
-│   ├── api_server.py          # FastAPI 接口服务
+│   ├── api_server.py          # FastAPI 后端服务入口
 │   ├── check_data.py          # 数据质量与冲突检查脚本
 │   └── analyze_errors.py      # 错误案例分析工具
-├── model/                     # 训练好的模型保存路径 (Git忽略)
+├── static/                    # [新增] 静态资源目录
+│   └── index.html             # [新增] Web 前端页面
+├── model/                     # 训练好的模型保存路径 (自动生成，已忽略)
 ├── utils/                     # 通用工具包
-└── requirements.txt           # 依赖列表
+└── requirements.txt           # 项目依赖列表
 ```
 
 ### 🛠️ 环境安装
@@ -138,6 +144,8 @@ garbage_classification/
 │   ├── api_server.py          # FastAPI server
 │   ├── check_data.py          # Data quality & conflict checker
 │   └── analyze_errors.py      # Error analysis on validation set
+├── static/                    # add static resources
+│   └── index.html             # add Web index
 ├── model/                     # Directory for saving trained models (Excluded from git)
 ├── utils/                     # Utility functions
 └── requirements.txt           # Dependencies

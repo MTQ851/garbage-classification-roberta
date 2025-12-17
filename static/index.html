@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能垃圾分类助手</title>
+    <!-- 优化1：替换为国内 BootCDN 镜像 -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            /* 垃圾分类标准色 */
+            --color-recyclable: #0073e6; /* 可回收 - 蓝 */
+            --color-hazardous: #e63946;  /* 有害 - 红 */
+            --color-wet: #6a994e;        /* 湿垃圾 - 绿 */
+            --color-dry: #495057;        /* 干垃圾 - 灰/黑 */
+
+            --primary: #10b981;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #dcfce7 100%);
+            --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            /* 优化3：使用系统原生字体栈 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: var(--bg-gradient);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 装饰背景圆 */
+        .circle-bg {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            background: linear-gradient(45deg, #34d399, #60a5fa);
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.2;
+            z-index: 0;
+        }
+        .c-1 { top: -50px; left: -50px; }
+        .c-2 { bottom: -50px; right: -50px; }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #059669, #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        p.subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        /* 搜索框区域 */
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-radius: 12px;
+            background: white;
+            transition: transform 0.2s;
+        }
+
+        .search-box:focus-within {
+            transform: scale(1.02);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.2);
+        }
+
+        input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            font-size: 1rem;
+            outline: none;
+            background: transparent;
+        }
+
+        button.search-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button.search-btn:hover {
+            background: #059669;
+        }
+
+        /* 快速标签 */
+        .quick-tags {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .tag {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tag:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        /* 结果展示区 */
+        .result-card {
+            display: none; /* 默认隐藏 */
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            animation: slideUp 0.4s ease-out;
+            border-top: 5px solid #ccc; /* 动态颜色 */
+        }
+
+        .icon-large {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .result-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #1f2937;
+        }
+
+        .result-desc {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            background: #f3f4f6;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: left;
+        }
+
+        .detail-item label {
+            display: block;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-bottom: 4px;
+        }
+
+        .detail-item span {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        /* 底部源码链接样式 */
+        .footer-info {
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 1px dashed #e5e7eb;
+            font-size: 0.8rem;
+            color: #9ca3af;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .footer-info a {
+            color: #6b7280;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .footer-info a:hover {
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        /* 动态类别样式 */
+        .type-recyclable { color: var(--color-recyclable); border-color: var(--color-recyclable) !important; }
+        .type-recyclable .result-desc { background: rgba(0, 115, 230, 0.1); color: var(--color-recyclable); }
+
+        .type-hazardous { color: var(--color-hazardous); border-color: var(--color-hazardous) !important; }
+        .type-hazardous .result-desc { background: rgba(230, 57, 70, 0.1); color: var(--color-hazardous); }
+
+        .type-wet { color: var(--color-wet); border-color: var(--color-wet) !important; }
+        .type-wet .result-desc { background: rgba(106, 153, 78, 0.1); color: var(--color-wet); }
+
+        .type-dry { color: var(--color-dry); border-color: var(--color-dry) !important; }
+        .type-dry .result-desc { background: rgba(73, 80, 87, 0.1); color: var(--color-dry); }
+
+        /* 加载动画 */
+        .loader {
+            display: none;
+            margin: 30px auto;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* AI 标识 */
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 480px) {
+            .container { padding: 25px; width: 100%; height: 100vh; border-radius: 0; display: flex; flex-direction: column; justify-content: center;}
+            .footer-info { margin-top: auto; border-top: none; padding-bottom: 20px;}
+        }
+    </style>
+    <!-- 添加这一行，解决 favicon.ico 404 错误 -->
+    <link rel="icon" href="data:,">
+</head>
+<body>
+
+    <div class="container">
+        <div class="circle-bg c-1"></div>
+        <div class="circle-bg c-2"></div>
+
+        <div class="content-wrapper">
+            <h1>AI 垃圾分类助手</h1>
+            <p class="subtitle">输入物品名称，AI 帮您快速识别分类</p>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="例如：香蕉皮、电池、旧书..." autocomplete="off">
+                <button class="search-btn" onclick="searchWaste()">
+                    <i class="fas fa-search"></i> 查询
+                </button>
+            </div>
+
+            <div class="quick-tags">
+                <div class="tag" onclick="fillAndSearch('苹果核')">🍎 苹果核</div>
+                <div class="tag" onclick="fillAndSearch('矿泉水瓶')">💧 矿泉水瓶</div>
+                <div class="tag" onclick="fillAndSearch('废电池')">🔋 废电池</div>
+                <div class="tag" onclick="fillAndSearch('卫生纸')">🧻 卫生纸</div>
+            </div>
+
+            <div class="loader" id="loader"></div>
+
+            <!-- 结果展示 -->
+            <div class="result-card" id="resultCard">
+                <i id="typeIcon" class="fas fa-trash icon-large"></i>
+                <div class="result-title">
+                    <span id="itemName">物品名称</span>
+                </div>
+                <div id="typeDesc" class="result-desc">分类结果</div>
+
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <label>识别来源</label>
+                        <span id="sourceInfo">AI 预测</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>AI 置信度</label>
+                        <span id="confidenceInfo">99%</span>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9rem; color: #666; line-height: 1.5;" id="fullDesc">
+                    详细分类说明...
+                </p>
+            </div>
+
+            <!-- 源码链接区域 -->
+            <div class="footer-info">
+                <span>开源项目：</span>
+                <a href="https://github.com/MTQ851/garbage-classification-roberta" target="_blank" title="访问 GitHub 仓库">
+                    <i class="fab fa-github"></i> GitHub
+                </a>
+                <span style="color: #ddd">|</span>
+                <a href="https://gitee.com/mtq851/garbage-classification-roberta" target="_blank" title="访问 Gitee 仓库">
+                    <i class="fas fa-code-branch"></i> Gitee
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const loader = document.getElementById('loader');
+        const resultCard = document.getElementById('resultCard');
+
+        // 监听回车键
+        searchInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchWaste();
+            }
+        });
+
+        // 快速标签点击
+        function fillAndSearch(name) {
+            searchInput.value = name;
+            searchWaste();
+        }
+
+        // 核心查询逻辑
+        async function searchWaste() {
+            const name = searchInput.value.trim();
+            if (!name) {
+                alert('请输入垃圾名称');
+                return;
+            }
+
+            // UI 状态重置
+            loader.style.display = 'block';
+            resultCard.style.display = 'none';
+            resultCard.className = 'result-card'; // 重置颜色类
+
+            try {
+                // 设置 5 秒超时
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                // 🔥 确保 URL 和参数正确，如果后端没改代码，这里记得用 ?name= 或 ?text=
+                // 假设后端现在接收 'text' 参数
+                const response = await fetch(`http://127.0.0.1:9000/predict?text=${encodeURIComponent(name)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                // 🔥 核心修改：检查 HTTP 状态码，而不是 JSON 里的 code
+                if (response.ok) {
+                    const resData = await response.json();
+
+                    // 🔥 核心修改：resData 直接就是数据对象 {type: 4, name: "...", ...}
+                    // 不需要 resData.code === 200 和 resData.data
+                    if (resData && resData.type) {
+                        renderResult(resData, name);
+                    } else {
+                         alert('数据格式错误，未找到分类信息。');
+                    }
+                } else {
+                    alert('未找到该物品的分类信息，请尝试其他名称。');
+                }
+            } catch (error) {
+                loader.style.display = 'none';
+                if (error.name === 'AbortError') {
+                    alert('请求超时，请检查网络。');
+                } else {
+                    alert('请求失败，请确保后台 API 已启动。');
+                }
+                console.error(error);
+            }
+        }
+
+        // 渲染结果
+        function renderResult(data, inputName) {
+            // 🔥 这里 data 已经是直接的 {type, confidence...} 对象了
+            const { type, confidence, source, desc, name: apiName } = data;
+
+            // 1. 设置基础信息
+            document.getElementById('itemName').innerText = apiName || inputName;
+            document.getElementById('confidenceInfo').innerText = confidence;
+            document.getElementById('fullDesc').innerText = desc;
+
+            // 2. 处理来源显示 (美化)
+            const sourceEl = document.getElementById('sourceInfo');
+            if(source && source.includes('ai_predict')) {
+                sourceEl.innerHTML = 'AI 深度学习 <i class="fas fa-robot" style="color:#8b5cf6;"></i>';
+            } else {
+                sourceEl.innerHTML = '标准字典库 <i class="fas fa-book" style="color:#10b981;"></i>';
+            }
+
+            // 3. 根据 Type 映射样式和图标
+            const typeMap = {
+                1: { class: 'type-recyclable', icon: 'fa-recycle', text: '可回收物' },
+                2: { class: 'type-dry', icon: 'fa-trash-alt', text: '干垃圾 / 其他垃圾' },
+                3: { class: 'type-wet', icon: 'fa-apple-alt', text: '湿垃圾 / 厨余垃圾' },
+                4: { class: 'type-hazardous', icon: 'fa-skull-crossbones', text: '有害垃圾' }
+            };
+
+            // 获取映射配置，默认给干垃圾
+            const config = typeMap[type] || typeMap[2];
+
+            // 应用样式
+            resultCard.classList.add(config.class);
+            document.getElementById('typeIcon').className = `fas ${config.icon} icon-large`;
+            document.getElementById('typeDesc').innerText = config.text;
+
+            // 显示卡片
+            loader.style.display = 'none';
+            resultCard.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
