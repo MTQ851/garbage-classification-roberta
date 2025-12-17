@@ -21,6 +21,9 @@
 *   **生产级接口**：基于 **FastAPI** 封装了高性能的 HTTP 接口，支持 GET 请求调用。
 *   **数据清洗工具**：内置数据冲突检测脚本，防止“脏数据”影响模型训练。
 
+###    在线网页Demo
+https://tool.kerten.cn/rb/ 
+
 ###    界面预览
 ![Web界面预览](assets/web_ui_preview.png)
 ### 📂 目录结构
