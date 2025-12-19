@@ -50,7 +50,7 @@ garbage_classification/
 
 1.  **克隆项目**
     ```bash
-    git clone https://github.com/your-username/garbage_classification.git
+    git clone https://github.com/MTQ851/garbage-classification-roberta.git
     cd garbage_classification
     ```
 
@@ -158,7 +158,7 @@ garbage_classification/
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/garbage_classification.git
+    git clone https://github.com/MTQ851/garbage-classification-roberta.git
     cd garbage_classification
     ```
 
