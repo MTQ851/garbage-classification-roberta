@@ -2,6 +2,8 @@ import os
 import torch
 import pandas as pd
 import uvicorn
+import jieba  # 【关键】引入 jieba
+import jieba.posseg as pseg  # 【关键】引入词性标注
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
@@ -9,7 +11,7 @@ from transformers import BertTokenizer, BertForSequenceClassification
 
 
 # ==========================================
-# 1. 核心分类器逻辑 (修复返回值数量)
+# 1. 核心分类器逻辑 (已同步 predict.py 的修复)
 # ==========================================
 class GarbageClassifier:
     def __init__(self):
@@ -18,9 +20,9 @@ class GarbageClassifier:
         model_path = os.path.join(base_dir, "../model/roberta_garbage_model")
         data_path = os.path.join(base_dir, "../data/garbage_sorting.csv")
 
-        print(f">>> 初始化服务...")
+        print(f">>> 初始化 API 服务...")
 
-        # 1. 构建规则库 (直接存 int 类型)
+        # 1. 构建规则库 & 同步 Jieba 词库
         self.rules = {}
         if os.path.exists(data_path):
             try:
@@ -28,10 +30,18 @@ class GarbageClassifier:
             except:
                 df = pd.read_csv(data_path, encoding='gbk')
 
+            print(f"    正在同步 CSV 数据到分词库...")
             for _, row in df.iterrows():
                 name = str(row['garbage_name']).strip()
-                # 存入数值类型
-                self.rules[name] = int(row['type'])
+                t_id = int(row['type'])
+
+                # A. 存入规则库
+                self.rules[name] = t_id
+
+                # B. 【API 核心修复】告诉 jieba 这是一个专有名词，不要切开！
+                # 只有加上这行，"快递盒"才会被识别为一个整体，而不是"快递"+"盒"
+                jieba.add_word(name, freq=100000, tag='n')
+
             print(f"    规则库加载完成: {len(self.rules)} 条")
         else:
             print("    [警告] 数据文件未找到，仅使用模型模式。")
@@ -41,32 +51,62 @@ class GarbageClassifier:
         print(f"    加载推理设备: {self.device}")
 
         if not os.path.exists(model_path):
-            # 如果没有训练好的模型，为了防止API启动失败，这里可以打印警告，或者抛出异常
-            # 这里抛出异常提醒你去训练
             raise FileNotFoundError(f"模型路径不存在: {model_path}，请先运行 train.py")
 
         self.tokenizer = BertTokenizer.from_pretrained(model_path)
         self.model = BertForSequenceClassification.from_pretrained(model_path)
         self.model.to(self.device)
         self.model.eval()
-        print(">>> 服务初始化完成！")
+
+        # 预热分词器
+        print("    预热分词组件...")
+        pseg.cut("初始化")
+        print(">>> 服务启动成功！")
+
+    def extract_core_noun(self, text):
+        """
+        核心名词提取逻辑
+        """
+        try:
+            words = pseg.cut(text)
+            nouns = []
+            for word, flag in words:
+                # 提取名词(n)和名动词(vn)
+                if flag.startswith('n') or flag.startswith('vn'):
+                    nouns.append(word)
+
+            # 返回最长的名词
+            if nouns:
+                return max(nouns, key=len)
+        except:
+            pass
+        return None
 
     def predict(self, text):
         """
-        核心修复点：确保无论走规则还是走AI，都返回 3 个值
         Returns: (type_int, confidence_str, source_str)
         """
-        text = str(text).strip()
-        if not text:
+        raw_text = str(text).strip()
+        if not raw_text:
             return None, None, None
 
-        # --- 策略A：规则匹配 ---
-        if text in self.rules:
-            # 【修复】返回 3 个值
-            return self.rules[text], "100.00%", "rule_match"
+        # --- 策略A：原词精准规则匹配 ---
+        if raw_text in self.rules:
+            return self.rules[raw_text], "100.00%", "rule_match_exact"
 
-        # --- 策略B：模型预测 ---
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=64)
+        # --- 策略B：提取核心名词后查规则 (解决"拆开了的快递盒") ---
+        core_noun = self.extract_core_noun(raw_text)
+
+        # 如果提取出的核心词（如"快递盒"）在规则库里
+        if core_noun and core_noun != raw_text:
+            if core_noun in self.rules:
+                return self.rules[core_noun], "100.00%", f"rule_match_keyword({core_noun})"
+
+        # --- 策略C：AI 模型预测 ---
+        # 优先用核心词喂给 AI
+        ai_input = core_noun if core_noun else raw_text
+
+        inputs = self.tokenizer(ai_input, return_tensors="pt", truncation=True, max_length=64)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         with torch.no_grad():
@@ -76,43 +116,43 @@ class GarbageClassifier:
         pred_id = torch.argmax(probs, dim=-1).item()
         confidence = probs[0][pred_id].item()
 
-        # 将模型预测的 0-3 映射回 1-4
         predicted_type = pred_id + 1
         conf_str = f"{confidence * 100:.2f}%"
 
-        # 【修复】返回 3 个值
-        return predicted_type, conf_str, "ai_predict"
+        # 标记来源
+        source_desc = f"ai_predict({ai_input})" if ai_input != raw_text else "ai_predict"
+
+        return predicted_type, conf_str, source_desc
 
 
 # ==========================================
-# 2. FastAPI 接口定义 (GET 版本)
+# 2. FastAPI 接口定义
 # ==========================================
 
 class PredictResponse(BaseModel):
     name: str
-    type: int  # 数值类型
+    type: int
     confidence: str
     source: str
     desc: str
 
 
-app = FastAPI(title="垃圾分类 API", version="1.3")
-# 解决跨域问题 (CORS)
+app = FastAPI(title="垃圾分类 API", version="1.5")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源，生产环境建议改为具体的域名
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 允许 GET, POST 等所有方法
+    allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 classifier = None
 
 TYPE_DESC_MAP = {
     1: "可回收物",
-    2: "干垃圾/其他垃圾",
-    3: "湿垃圾/厨余垃圾",
+    2: "其他垃圾/干垃圾",
+    3: "厨余垃圾/湿垃圾",
     4: "有害垃圾"
 }
 
@@ -128,7 +168,6 @@ async def api_predict(text: str):
     if not classifier:
         raise HTTPException(status_code=500, detail="Model not initialized")
 
-    # 这里接收 3 个返回值，如果 predict 方法只返回 2 个就会报错
     label_id, conf, source = classifier.predict(text)
 
     if label_id is None:
@@ -145,5 +184,4 @@ async def api_predict(text: str):
 
 if __name__ == "__main__":
     print("正在启动 API 服务...")
-    # 端口可以根据需要修改，这里用 9000
     uvicorn.run(app, host="0.0.0.0", port=9000)
